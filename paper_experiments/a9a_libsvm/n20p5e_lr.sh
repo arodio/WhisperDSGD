@@ -21,7 +21,7 @@ cd ../..
 n_tasks=20
 n_rounds=5000
 epsilons=(3 5 7 10 15 20 30 40)
-lrs=(0.1 0.05 0.01 0.005)
+lrs=(0.001)
 connectivities=(0.5)
 dp_mechanisms=("ldp" "pairwise" "mixing")
 seeds=(12345)

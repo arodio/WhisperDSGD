@@ -29,6 +29,26 @@ class TwoLinearLayers(nn.Module):
         return self.fc2(self.fc1(x))
 
 
+class TitanicNN(nn.Module):
+    def __init__(self, input_dimension, hidden_dimensions, output_dimension):
+        super(TitanicNN, self).__init__()
+        self.layers = nn.ModuleList()
+        self.layers.append(nn.Linear(input_dimension, hidden_dimensions[0]))
+
+        for i in range(len(hidden_dimensions) - 1):
+            self.layers.append(nn.Linear(hidden_dimensions[i], hidden_dimensions[i + 1]))
+
+        self.output = nn.Linear(hidden_dimensions[-1], output_dimension)
+        self.dropout = nn.Dropout(0.2)
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = F.relu(layer(x))
+            x = self.dropout(x)
+        x = self.output(x)
+        return x
+
+
 class MnistCNN(nn.Module):
     def __init__(self, num_classes=10):
         super(MnistCNN, self).__init__()

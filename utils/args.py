@@ -32,7 +32,13 @@ class ArgumentsManager(ABC):
         )
         self.parser.add_argument(
             '--bz',
-            help='batch_size; default is 1',
+            help='minibatch_size; default is 1',
+            type=int,
+            default=1
+        )
+        self.parser.add_argument(
+            '--mbz',
+            help='microbatch_size; default is 1',
             type=int,
             default=1
         )
@@ -121,6 +127,18 @@ class TrainArgumentsManager(ArgumentsManager):
                  'default is "constant"',
             type=str,
             default="constant"
+        )
+        self.parser.add_argument(
+            "--momentum",
+            type=float,
+            help='momentum parameter; default is 0.0',
+            default=0.0
+        )
+        self.parser.add_argument(
+            "--weight_decay",
+            type=float,
+            help='weight decay parameter; default is 0.0',
+            default=0.0
         )
         self.parser.add_argument(
             '--validation',

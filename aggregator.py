@@ -169,11 +169,12 @@ class Aggregator(ABC):
                 print(f"Test Loss: {global_test_loss:.3f} | Test Acc: {global_test_acc * 100:.3f}% |")
                 print("+" * 50)
 
-            global_logger.add_scalar("Train/Loss", global_train_loss, counter)
-            global_logger.add_scalar("Train/Metric", global_train_acc, counter)
-            global_logger.add_scalar("Test/Loss", global_test_loss, counter)
-            global_logger.add_scalar("Test/Metric", global_test_acc, counter)
-            global_logger.flush()
+            if global_logger is not None:
+                global_logger.add_scalar("Train/Loss", global_train_loss, counter)
+                global_logger.add_scalar("Train/Metric", global_train_acc, counter)
+                global_logger.add_scalar("Test/Loss", global_test_loss, counter)
+                global_logger.add_scalar("Test/Metric", global_test_acc, counter)
+                global_logger.flush()
 
         if self.verbose > 0:
             print("#" * 80)

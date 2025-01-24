@@ -2,9 +2,6 @@ import string
 
 ERROR = 1e-10
 
-MOMENTUM = 0.0
-WEIGHT_DECAY = 0.0
-
 ALL_STRATEGIES = {
     "random"
 }
@@ -12,8 +9,10 @@ ALL_STRATEGIES = {
 ALL_MODELS = {
     "mobilenet"
 }
+
 LOADER_TYPE = {
     "synthetic": "tabular",
+    "titanic": "titanic",
     "a9a": "a9a",
     "mnist": "mnist",
     "cifar10": "cifar10",
@@ -24,6 +23,7 @@ LOADER_TYPE = {
 
 EXTENSIONS = {
     "tabular": ".pkl",
+    "titanic": ".pkl",
     "a9a": ".pkl",
     "mnist": ".pkl",
     "cifar10": ".pkl",
@@ -34,19 +34,13 @@ EXTENSIONS = {
 
 N_CLASSES = {
     "synthetic": 1,
+    "titanic": 1,
     "a9a": 1,
     "mnist": 10,
     "cifar10": 10,
     "cifar100": 100,
     "femnist": 62,
     "shakespeare": 100
-}
-
-EMBEDDING_DIM = {
-    "cifar10": 1280,
-    "cifar100": 1280,
-    "femnist": 1280,
-    "shakespeare": 1024
 }
 
 SHAKESPEARE_CONFIG = {

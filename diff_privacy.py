@@ -90,6 +90,7 @@ class DPNoiseGenerator:
 
         if self.dp_mechanism == 'cdp':
             self.noise_params = solve_cdp(n_clients, privacy_bound)
+            print(self.noise_params)
         elif self.dp_mechanism == 'ldp':
             self.noise_params = solve_ldp(n_clients, privacy_bound)
         elif self.dp_mechanism == 'pairwise':

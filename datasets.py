@@ -2,6 +2,7 @@ import os
 import pickle
 import string
 
+from data.titanic.titanic import TitanicDataset
 from data.a9a.libsvm import LIBSVM
 
 import torch
@@ -44,6 +45,56 @@ class TabularDataset(Dataset):
     def __getitem__(self, idx):
         x, y = self.data[idx]
         return torch.tensor(x, dtype=torch.float32), torch.tensor(y, dtype=torch.int64), idx
+
+
+class SubTitanic(Dataset):
+    """
+    Constructs a subset of the titanic dataset from a pickle file;
+    expects pickle file to store list of indices
+
+    Attributes
+    ----------
+    indices : list of indices
+    data : torch.Tensor
+    targets : torch.Tensor
+
+    Methods
+    -------
+    __init__(path, titanic_data=None, titanic_targets=None)
+    __len__()
+    __getitem__(index)
+    """
+
+    def __init__(self, path, titanic_data=None, titanic_targets=None):
+        """
+        Initialize SubA9A dataset.
+
+        Parameters
+        ----------
+        path : str
+            Path to the pickle file storing indices.
+        titanic_data : torch.Tensor, optional
+            Tensor containing the full titanic dataset features.
+        titanic_targets : torch.Tensor, optional
+            Tensor containing the full titanic dataset labels.
+        """
+
+        with open(path, "rb") as f:
+            self.indices = pickle.load(f)
+
+        if titanic_data is None or titanic_targets is None:
+            self.data, self.targets = get_titanic()
+        else:
+            self.data, self.targets = titanic_data, titanic_targets
+
+        self.data = titanic_data[self.indices]
+        self.targets = titanic_targets[self.indices]
+
+    def __len__(self):
+        return self.data.size(0)
+
+    def __getitem__(self, index):
+        return self.data[index], self.targets[index], index
 
 
 class SubA9A(Dataset):
@@ -239,6 +290,7 @@ class SubCIFAR10(Dataset):
 
         return img, target, index
 
+
 class SubCIFAR100(Dataset):
     """
     Constructs a subset of CIFAR100 dataset from a pickle file;
@@ -392,6 +444,37 @@ class CharacterDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.inputs[idx], self.targets[idx], idx
+
+
+def get_titanic():
+    """
+    gets full (both train and test) titanic dataset inputs and labels;
+    the dataset should be first downloaded (see data/titanic)
+
+    :return:
+        titanic_data, titanic_targets
+
+    """
+    titanic_path = os.path.join("data", "titanic", "raw_data")
+    assert os.path.isdir(titanic_path), "Download the titanic dataset!!"
+
+    # Load train and test datasets
+    titanic_train = TitanicDataset(os.path.join(titanic_path, "train.csv"))
+    titanic_test = TitanicDataset(os.path.join(titanic_path, "test.csv"))
+
+    # Combine data and targets
+    titanic_data = \
+        torch.cat([
+            titanic_train.data.clone().detach(),
+            titanic_test.data.clone().detach()
+        ])
+    titanic_targets = \
+        torch.cat([
+            titanic_train.targets.clone().detach(),
+            titanic_test.targets.clone().detach()
+        ])
+
+    return titanic_data, titanic_targets
 
 
 def get_a9a():

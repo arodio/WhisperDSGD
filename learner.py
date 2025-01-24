@@ -156,102 +156,197 @@ class Learner:
 
         self.model.train()
 
-        x, y, indices = batch
-        x = x.to(self.device).type(torch.float32)
-        y = y.to(self.device)
+        x_minibatch, y_minibatch, indices = batch
 
-        if self.is_binary_classification:
-            y = y.type(torch.float32).unsqueeze(1)
+        x_minibatch = x_minibatch.to(self.device)
+        y_minibatch = y_minibatch.to(self.device)
 
-        self.optimizer.zero_grad()
-
-        y_pred = self.model(x)
-        loss_vec = self.criterion(y_pred, y)
-        metric = self.metric(y_pred, y) / len(y)
-
-        if weights is not None:
-            weights = weights.to(self.device)
-            loss = (loss_vec.T @ weights[indices]) / loss_vec.size(0)
-        else:
-            loss = loss_vec.mean()
-
-        for frozen_module in frozen_modules:
-            frozen_module.zero_grad()
-
-        loss.backward()
-
-        # Apply optimizer step with or without noise
+        # DP optimizer  / self.optimizer.microbatch_step() is callable
         if dp_noise is not None:
+            self.optimizer.zero_grad()
+
+            loss_minibatch = 0.
+            metric_minibatch = 0.
+            n_samples_minibatch = 0
+
+            # Split minibatches into microbatches
+            x_splits = torch.split(x_minibatch, self.optimizer.microbatch_size)
+            y_splits = torch.split(y_minibatch, self.optimizer.microbatch_size)
+
+            for i, (x_microbatch, y_microbatch) in enumerate(zip(x_splits, y_splits)):
+                x_microbatch = x_microbatch.to(self.device).type(torch.float32)
+                y_microbatch = y_microbatch.to(self.device)
+
+                # Keep track of microbatch size
+                microbatch_size = y_microbatch.size(0)
+
+                if self.is_binary_classification:
+                    y_microbatch = y_microbatch.type(torch.float32).unsqueeze(1)
+
+                # Zero microbatch gradients
+                self.optimizer.zero_microbatch_grad()
+
+                # Forward + loss
+                y_microbatch_pred = self.model(x_microbatch)
+                loss_microbatch_vec = self.criterion(y_microbatch_pred, y_microbatch)
+
+                if weights is not None:
+                    w = weights[indices].to(self.device)
+                    # Slice the relevant portion for this microbatch
+                    start = i * self.optimizer.microbatch_size
+                    end = start + microbatch_size
+                    w_microbatch = w[start:end]
+                    loss_microbatch = (loss_microbatch_vec * w_microbatch).mean()
+                else:
+                    loss_microbatch = loss_microbatch_vec.mean()
+
+                # Backward
+                loss_microbatch.backward()
+
+                # Clip and accumulate gradients
+                self.optimizer.microbatch_step()
+
+                # Accumulate loss/metric over microbatch
+                loss_minibatch += loss_microbatch.item() * microbatch_size
+                metric_minibatch += self.metric(y_microbatch_pred, y_microbatch).item() * microbatch_size
+                n_samples_minibatch += microbatch_size
+
+            # Zero gradients for frozen modules
+            for frozen_module in frozen_modules:
+                frozen_module.zero_grad()
+
+            # Add DP noise and update parameters
             self.optimizer.step(dp_noise)
+
+            loss_minibatch /= n_samples_minibatch
+            metric_minibatch /= n_samples_minibatch
+
+        # Non-DP training
         else:
+            if self.is_binary_classification:
+                y_minibatch = y_minibatch.type(torch.float32).unsqueeze(1)
+
+            self.optimizer.zero_grad()
+
+            y_minibatch_pred = self.model(x_minibatch)
+            loss_minibatch_vec = self.criterion(y_minibatch_pred, y_minibatch)
+
+            if weights is not None:
+                weights = weights.to(self.device)
+                loss_minibatch = (loss_minibatch_vec.T @ weights[indices]) / loss_minibatch_vec.size(0)
+            else:
+                loss_minibatch = loss_minibatch_vec.mean()
+
+            metric_minibatch = self.metric(y_minibatch_pred, y_minibatch).item()
+
+            for frozen_module in frozen_modules:
+                frozen_module.zero_grad()
+
+            loss_minibatch.backward()
+
             self.optimizer.step()
 
         if self.lr_scheduler:
             self.lr_scheduler.step()
 
-        return loss.item(), metric.item()
+        return float(loss_minibatch), float(metric_minibatch)
 
     def fit_epoch(self, loader, weights=None, frozen_modules=None, dp_noise=None):
-        """
-        perform several optimizer steps on all batches drawn from `loader`
-
-        :param loader:
-        :type loader: torch.utils.data.DataLoader
-        :param weights: tensor with the learners_weights of each sample or None
-        :type weights: torch.tensor or None
-        :param frozen_modules: list of frozen models; default is None
-        :param dp_noise:
-
-        :return:
-            loss.item()
-            metric.item()
-
-        """
         if frozen_modules is None:
             frozen_modules = []
-
         self.model.train()
 
         global_loss = 0.
         global_metric = 0.
         n_samples = 0
 
-        for x, y, indices in loader:
-            x = x.to(self.device).type(torch.float32)
-            y = y.to(self.device)
+        # DP optimizer  / self.optimizer.microbatch_step() is callable
+        if dp_noise is not None:
+            for x_minibatch, y_minibatch, indices in loader:
+                self.optimizer.zero_grad()
 
-            n_samples += y.size(0)
+                # Split into microbatches
+                x_splits = torch.split(x_minibatch, self.optimizer.microbatch_size)
+                y_splits = torch.split(y_minibatch, self.optimizer.microbatch_size)
 
-            if self.is_binary_classification:
-                y = y.type(torch.float32).unsqueeze(1)
+                for x_microbatch, y_microbatch in zip(x_splits, y_splits):
+                    x_microbatch = x_microbatch.to(self.device)
+                    y_microbatch = y_microbatch.to(self.device)
 
-            self.optimizer.zero_grad()
+                    if self.is_binary_classification:
+                        y_microbatch = y_microbatch.unsqueeze(1).float()
+                    n_samples += y_microbatch.size(0)
 
-            y_pred = self.model(x)
+                    self.optimizer.zero_microbatch_grad()
 
-            loss_vec = self.criterion(y_pred, y)
-            if weights is not None:
-                weights = weights.to(self.device)
-                loss = (loss_vec.T @ weights[indices]) / loss_vec.size(0)
-            else:
-                loss = loss_vec.mean()
+                    # Forward + loss
+                    y_microbatch_pred = self.model(x_microbatch)
+                    loss_microbatch_vec = self.criterion(y_microbatch_pred, y_microbatch)
 
-            loss.backward()
+                    if weights is not None:
+                        weights = weights.to(self.device)
+                        w = weights[indices]  # shape: [batch_size]
+                        # slice w for the current microbatch if needed
+                        # (be careful to align the microbatch indices with the weights indexing)
+                        # For example:
+                        # w_microbatch = w[start:end]
+                        # Then compute weighted average
+                        loss_microbatch = (loss_microbatch_vec * w_microbatch).mean()
+                    else:
+                        loss_microbatch = loss_microbatch_vec.mean()
 
-            for frozen_module in frozen_modules:
-                frozen_module.zero_grad()
+                    # Backward
+                    loss_microbatch.backward()
 
-            # Apply optimizer step with or without noise
-            if dp_noise is not None:
+                    # Clip and accumulate
+                    self.optimizer.microbatch_step()
+
+                    global_loss += loss_microbatch.item() * y_microbatch.size(0)
+                    global_metric += self.metric(y_microbatch_pred, y_microbatch).item()
+
+                # Zero gradients for frozen modules
+                for frozen_module in frozen_modules:
+                    frozen_module.zero_grad()
+
+                # Add DP noise and update parameters
                 self.optimizer.step(dp_noise)
-            else:
+
+        else:
+            # Non-DP training
+            for x_minibatch, y_minibatch, indices in loader:
+                x_minibatch = x_minibatch.to(self.device)
+                y_minibatch = y_minibatch.to(self.device)
+
+                if self.is_binary_classification:
+                    y_minibatch = y_minibatch.unsqueeze(1).float()
+
+                n_samples += y_minibatch.size(0)
+
+                self.optimizer.zero_grad()
+
+                y_pred = self.model(x_minibatch)
+                loss_vec = self.criterion(y_pred, y_minibatch)
+
+                if weights is not None:
+                    weights = weights.to(self.device)
+                    w = weights[indices]
+                    loss = (loss_vec * w).mean()
+                else:
+                    loss = loss_vec.mean()
+
+                loss.backward()
+
+                # Zero gradients for frozen modules
+                for frozen_module in frozen_modules:
+                    frozen_module.zero_grad()
+
                 self.optimizer.step()
+
+                global_loss += loss.item() * y_minibatch.size(0)
+                global_metric += self.metric(y_pred, y_minibatch).item()
 
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
-
-            global_loss += loss.item() * loss_vec.size(0)
-            global_metric += self.metric(y_pred, y).item()
 
         return global_loss / n_samples, global_metric / n_samples
 

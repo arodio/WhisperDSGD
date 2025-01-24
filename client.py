@@ -87,11 +87,12 @@ class Client(object):
         train_loss, train_acc = self.learner.evaluate_loader(self.val_loader)
         test_loss, test_acc = self.learner.evaluate_loader(self.test_loader)
 
-        self.logger.add_scalar("Train/Loss", train_loss, counter)
-        self.logger.add_scalar("Train/Metric", train_acc, counter)
-        self.logger.add_scalar("Test/Loss", test_loss, counter)
-        self.logger.add_scalar("Test/Metric", test_acc, counter)
-        self.logger.flush()
+        if self.logger is not None:
+            self.logger.add_scalar("Train/Loss", train_loss, counter)
+            self.logger.add_scalar("Train/Metric", train_acc, counter)
+            self.logger.add_scalar("Test/Loss", test_loss, counter)
+            self.logger.add_scalar("Test/Metric", test_acc, counter)
+            self.logger.flush()
 
         return train_loss, train_acc, test_loss, test_acc
 

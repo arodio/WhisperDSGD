@@ -35,18 +35,24 @@ def get_loader(
 ):
     """
     constructs a torch.utils.DataLoader object from the given path
-    :param type_: type of the dataset; possible are `tabular`, `mnist`, `cifar10` and `cifar100`, `emnist`,
-     `femnist` and `shakespeare`
+    :param type_: type of the dataset; possible are `titanic`, `a9a`, `mnist`, `cifar10` and `cifar100`, and `femnist`
     :param path: path to the data file
     :param batch_size:
     :param train: flag indicating if train loader or test loader
-    :param inputs: tensor storing the input data; only used with `cifar10`, `cifar100` and `emnist`; default is None
-    :param targets: tensor storing the labels; only used with `cifar10`, `cifar100` and `emnist`; default is None
+    :param inputs: tensor storing the input data; only used with `cifar10`, `cifar100` and `femnist`; default is None
+    :param targets: tensor storing the labels; only used with `cifar10`, `cifar100` and `femnist`; default is None
 
     :return: torch.utils.DataLoader
     """
     if type_ == "tabular":
         dataset = TabularDataset(path)
+    elif type_ == "titanic":
+        dataset = \
+            SubTitanic(
+                path,
+                titanic_data=inputs,
+                titanic_targets=targets
+            )
     elif type_ == "a9a":
         dataset = \
             SubA9A(
@@ -109,7 +115,9 @@ def get_loaders(type_, data_dir, batch_size, is_validation):
         train_loader, val_loader, test_loader
         (List[torch.utils.DataLoader], List[torch.utils.DataLoader], List[torch.utils.DataLoader])
     """
-    if type_ == "a9a":
+    if type_ == "titanic":
+        inputs, targets = get_titanic()
+    elif type_ == "a9a":
         inputs, targets = get_a9a()
     elif type_ == "mnist":
         inputs, targets = get_mnist()
@@ -191,6 +199,12 @@ def get_model(name, model_name, device, input_dimension=None, hidden_dimension=N
             hidden_dimension=hidden_dimension,
             output_dimension=1
         )
+    elif name == "titanic":
+        model = TitanicNN(
+            input_dimension=8,
+            hidden_dimensions=[128, 1024, 512, 128],
+            output_dimension=1,
+        )
     elif name == "a9a":
         model = LinearLayer(input_dimension=123, num_classes=1)
     elif name == "mnist":
@@ -227,7 +241,7 @@ def get_model(name, model_name, device, input_dimension=None, hidden_dimension=N
     else:
         raise NotImplementedError(
             f"{name} is not available!"
-            f" Possible are: `cifar10`, `cifar100`, `emnist`, `femnist` and `shakespeare`."
+            f" Possible are: `titanic`, `a9a`, `mnist`, `cifar10`, `cifar100`, and `femnist`."
         )
 
     if chkpts_path is not None:
@@ -254,6 +268,7 @@ def get_optimizer(
         dp_mechanism,
         l2_norm_clip,
         minibatch_size,
+        microbatch_size,
         is_aggregator
 ):
     """
@@ -286,14 +301,15 @@ def get_optimizer(
             momentum=momentum,
             weight_decay=weight_decay,
             l2_norm_clip=l2_norm_clip,
-            minibatch_size=minibatch_size
+            minibatch_size=minibatch_size,
+            microbatch_size=microbatch_size
         )
     else:
         return optim.SGD(
             [param for param in model.parameters() if param.requires_grad],
             lr=lr_initial,
-            momentum=0.0,
-            weight_decay=0.0
+            momentum=momentum,
+            weight_decay=weight_decay
         )
 
 
@@ -351,6 +367,7 @@ def get_learner(
         dp_mechanism,
         l2_norm_clip,
         minibatch_size,
+        microbatch_size,
         is_aggregator,
         steps_per_epoch=None,
         input_dimension=None,
@@ -361,7 +378,7 @@ def get_learner(
     constructs the learner corresponding to an experiment for a given seed
 
     :param name: name of the experiment to be used; possible are
-            {`synthetic`, `cifar10`, `emnist`, `shakespeare`}
+            {`titanic`, `a9a`, `mnist`, `cifar10`, `cifar100`, and `femnist``}
 
     :param model_name: the name of the model to be used, only used when experiment is CIFAR-10, CIFAR-100 or FEMNIST
             possible are mobilenet and resnet
@@ -409,6 +426,10 @@ def get_learner(
     if name == "synthetic":
         criterion = nn.MSELoss(reduction="none").to(device)
         metric = mse
+        is_binary_classification = True
+    elif name == "titanic":
+        criterion = nn.BCEWithLogitsLoss(reduction="none").to(device)
+        metric = binary_accuracy
         is_binary_classification = True
     elif name == "a9a":
         criterion = nn.BCEWithLogitsLoss(reduction="none").to(device)
@@ -462,6 +483,7 @@ def get_learner(
             dp_mechanism=dp_mechanism,
             l2_norm_clip=l2_norm_clip,
             minibatch_size=minibatch_size,
+            microbatch_size=microbatch_size,
             is_aggregator=is_aggregator
         )
 
@@ -595,13 +617,14 @@ def get_aggregator(
                 scheduler_name=args.lr_scheduler,
                 initial_lr=args.lr,
                 n_rounds=args.n_rounds,
-                momentum=MOMENTUM,
-                weight_decay=WEIGHT_DECAY,
+                momentum=args.momentum,
+                weight_decay=args.weight_decay,
                 input_dimension=args.input_dimension,
                 hidden_dimension=args.hidden_dimension,
                 dp_mechanism=args.dp_mechanism,
                 l2_norm_clip=args.norm_clip,
                 minibatch_size=args.bz,
+                microbatch_size=args.mbz,
                 is_aggregator=is_aggregator,
                 seed=seed
             )

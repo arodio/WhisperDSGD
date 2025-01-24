@@ -1,7 +1,7 @@
-"""Simulate Federated Learning Training
+"""Simulate Decentralized/Federated Learning Training
 
-This script allows to simulate federated learning; the experiment name, the method and  be precised along side with the
-hyper-parameters of the experiment.
+This script allows to simulate decentralized/federated learning; the experiment name, the method and  be precised
+along side with the hyper-parameters of the experiment.
 
 The results of the experiment (i.e., training logs) are written to ./logs/ folder.
 
@@ -74,18 +74,23 @@ def init_clients(args_, data_dir, logs_dir, chkpts_dir):
                 seed=args_.seed,
                 input_dimension=args_.input_dimension,
                 hidden_dimension=args_.hidden_dimension,
-                momentum=MOMENTUM,
-                weight_decay=WEIGHT_DECAY,
+                momentum=args_.momentum,
+                weight_decay=args_.weight_decay,
                 dp_mechanism=args_.dp_mechanism,
                 l2_norm_clip=args_.norm_clip,
                 minibatch_size=args_.bz,
+                microbatch_size=args_.mbz,
                 is_aggregator=False
             )
 
         logs_path = os.path.join(logs_dir, "task_{}".format(task_id))
         save_path = os.path.join(chkpts_dir, "task_{}.pt".format(task_id)) if chkpts_dir else None
-        os.makedirs(logs_path, exist_ok=True)
-        logger = SummaryWriter(logs_path)
+
+        if args_.verbose > 0:
+            os.makedirs(logs_path, exist_ok=True)
+            logger = SummaryWriter(logs_path)
+        else:
+            logger = None
 
         client = get_client(
             learner=learner,
@@ -155,8 +160,12 @@ def run_experiment(arguments_manager_):
     global_train_logger = SummaryWriter(logs_path)
 
     logs_path = os.path.join(logs_dir, "test", "global")
-    os.makedirs(logs_path, exist_ok=True)
-    global_test_logger = SummaryWriter(logs_path)
+
+    if args_.verbose > 0:
+        os.makedirs(logs_path, exist_ok=True)
+        global_test_logger = SummaryWriter(logs_path)
+    else:
+        global_test_logger = None
 
     aggregator = \
         get_aggregator(
@@ -171,7 +180,13 @@ def run_experiment(arguments_manager_):
 
     if args_.verbose > 0:
         print("Training..")
-    for c_round in tqdm(range(1, args_.n_rounds+1)):
+
+    if args_.verbose > 0:
+        rounds_iter = tqdm(range(1, args_.n_rounds + 1))
+    else:
+        rounds_iter = range(1, args_.n_rounds + 1)
+
+    for c_round in rounds_iter:
 
         if args_.verbose > 0:
             print(f"current round: {c_round} | {args_.aggregator_type}")

@@ -3,6 +3,17 @@ import torch
 
 def make_dp_optimizer(cls):
     class DPOptimizerClass(cls):
+        """
+            Extends the torch.optim class to support differential privacy (DP) by
+            adding gradient clipping and noise injection. This implementation is adapted
+            from https://github.com/ChrisWaites/pyvacy/blob/master/pyvacy/optim/dp_optimizer.py.
+
+            Args:
+                cls (type): The base optimizer class (e.g., torch.optim.SGD) to be adapted.
+
+            Returns:
+                type: The same optimizer class with DP functionality.
+        """
         def __init__(self, params, l2_norm_clip, minibatch_size, microbatch_size, *args, **kwargs):
             super(DPOptimizerClass, self).__init__(params, *args, **kwargs)
 
@@ -15,9 +26,11 @@ def make_dp_optimizer(cls):
                                         group['params']]
 
         def zero_microbatch_grad(self):
+            """Resets gradients for the current microbatch."""
             super(DPOptimizerClass, self).zero_grad()
 
         def microbatch_step(self):
+            """Clips and accumulates gradients of the current microbatch."""
             # Compute total norm of microbatch gradients
             total_norm = 0.
             for group in self.param_groups:
@@ -36,12 +49,19 @@ def make_dp_optimizer(cls):
                         accum_grad.add_(param.grad.data.mul(clip_coef))
 
         def zero_grad(self):
+            """Resets accumulated gradients."""
             for group in self.param_groups:
                 for accum_grad in group['accum_grads']:
                     if accum_grad is not None:
                         accum_grad.zero_()
 
         def step(self, dp_noise=None, *args, **kwargs):
+            """
+                Updates model parameters using accumulated gradients and adds the differential privacy noise.
+
+                Args:
+                    dp_noise (torch.Tensor, optional): DP Noise. Default is None.
+            """
             noise_offset = 0
             for group in self.param_groups:
                 for param, accum_grad in zip(group['params'], group['accum_grads']):

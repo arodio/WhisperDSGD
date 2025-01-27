@@ -1,7 +1,7 @@
 # _Whisper D-SGD_: Correlated Noise Across Agents for Differentially Private Decentralized Learning
 
 This repository is the official implementation for  
-[_Whisper D-SGD_: Correlated Noise Across Agents for Differentially Private Decentralized Learning]().
+[_Whisper D-SGD_: Correlated Noise Across Agents for Differentially Private Decentralized Learning](https://arxiv.org/abs/2501.14644).
 
 Decentralized learning enables distributed agents to train a shared machine learning model through local computation and peer-to-peer communication. Although each agent retains its dataset locally, the communication of local models can still expose private information to adversaries. To mitigate these threats, local differential privacy (LDP) injects independent noise per agent, but it suffers a larger utility gap than central differential privacy (CDP).
 
@@ -64,11 +64,11 @@ Use `--epsilon e`, `--delta d`, `--norm_clip c` to define DP parameters and norm
 
 ### Datasets and Models
 
-| Dataset                                                                           | Task                 | Model                                                                     |
-|-----------------------------------------------------------------------------------|----------------------|---------------------------------------------------------------------------|
-| [Titanic](https://www.kaggle.com/c/titanic/data)                                  | Binary classification| `LinearLayer(input_dimension=9, num_classes=1)`                           |
-| [a9a LIBSVM](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html) | Binary classification| `LinearLayer(input_dimension=123, num_classes=1)`                         |
-| [MNIST](http://yann.lecun.com/exdb/mnist/)                                                                         | Image classification | `MnistCNN` (two convolutional layers + fully connected layers at the end) |
+| Dataset                                                                           | Task                 | Model                                                                    |
+|-----------------------------------------------------------------------------------|----------------------|--------------------------------------------------------------------------|
+| [Titanic](https://www.kaggle.com/c/titanic/data)                                  | Binary classification| `LinearLayer(input_dimension=9, num_classes=1)`                          |
+| [a9a LIBSVM](https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.html) | Binary classification| `LinearLayer(input_dimension=123, num_classes=1)`                        |
+| [MNIST](http://yann.lecun.com/exdb/mnist/)                                                                         | Image classification | `MnistCNN` (two convolutional layers + fully connected layers) |
 
 Scripts for generating partitions are under `data/<dataset>/generate_data.py`.  
 Use `--n_tasks <num_clients>` to specify how many clients to create.
@@ -149,6 +149,17 @@ Pull requests and issues are welcome. If you find a bug or have a feature reques
 If you use our code or method in your work, please cite our paper:
 
 ```commandline
-
+@misc{rodioWhisperDSGDCorrelated2025,
+  title = {Whisper {{D-SGD}}: {{Correlated Noise Across Agents}} for {{Differentially Private Decentralized Learning}}},
+  shorttitle = {Whisper {{D-SGD}}},
+  author = {Rodio, Angelo and Chen, Zheng and Larsson, Erik G.},
+  year = {2025},
+  month = jan,
+  number = {arXiv:2501.14644},
+  eprint = {2501.14644},
+  primaryclass = {cs},
+  publisher = {{arXiv}},
+  doi = {10.48550/arXiv.2501.14644}
+}
 ```
 
